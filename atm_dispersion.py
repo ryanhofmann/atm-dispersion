@@ -261,8 +261,13 @@ def atmospheric_refraction(
     elif input_alt is not None and input_az is not None:
         alt_all = input_alt
         az_all = input_az
-        ha_all = np.atan2(np.sin(az_all-180), (np.cos(az_all-180)*np.sin(lat)
-                                               + np.tan(alt_all)*np.cos(lat)))
+        dec = np.rad2deg(np.arcsin(np.sin(alt_all*u.deg) * np.sin(lat*u.deg)
+                                   + np.cos(alt_all*u.deg) * np.cos(lat*u.deg)
+                                     * np.cos(az_all*u.deg)).value)
+        ha_all = np.rad2deg(-np.arcsin(np.sin(az_all*u.deg)
+                                       * np.cos(alt_all*u.deg)
+                                       / np.cos(dec*u.deg)).value)
+        ha_all = (ha_all + 180) % 360 - 180
     else:
         local_sidereal = input_times.sidereal_time(
             'apparent', observer_location.geodetic.lon)
@@ -277,13 +282,12 @@ def atmospheric_refraction(
 
         # Get hour angle, altitude and azimuth
         # The rest of the program only uses the hour angle and altitude
-        ha_all = ((local_sidereal - sunpos_TETE.ra).deg + 360) % 360 * u.deg
-        ha_all = ha_all.value
+        ha_all = ((local_sidereal - sunpos_TETE.ra).deg + 180) % 360 - 180
         with erfa_astrom.set(ErfaAstromInterpolator(1440 * u.min)):
             frame_obstime = AltAz(obstime=input_times, location=observer_location)
             sunpos_altaz = sunpos.transform_to(frame_obstime)
         alt_all = sunpos_altaz.alt.deg
-        az_all = sunpos_altaz.alt.deg
+        az_all = sunpos_altaz.az.deg
 
     # continue with calculations
     beta = 0.001254*(273.15 + air_temp.value)/273.15
@@ -302,10 +306,10 @@ def atmospheric_refraction(
 
     # get everything in degrees
 
-    parallactic_angle_sin = np.clip(np.sin(np.deg2rad(ha_all))
-                                    / np.sin(np.deg2rad(90 - alt_all))
-                                    * np.sin(np.deg2rad(90 - lat)), -1, 1)
-    parallactic_angle = np.rad2deg(np.arcsin(parallactic_angle_sin))
+    parallactic_angle_sin = np.clip(np.sin(ha_all*u.deg)
+                                    / np.sin((90 - alt_all)*u.deg)
+                                    * np.sin((90 - lat)*u.deg), -1, 1)
+    parallactic_angle = np.rad2deg(np.arcsin(parallactic_angle_sin)).value
 
     if verbose == 1:
         print("\nInput Time(s) in Julian dates: ", input_times)
@@ -483,8 +487,7 @@ if __name__ == "__main__":
 
             # Get hour angle, altitude and azimuth
             # The rest of the program only uses the hour angle and altitude
-            ha_all = ((local_sidereal - sunpos_TETE.ra).deg + 360) % 360 * u.deg
-            ha_all = ha_all.value
+            ha_all = ((local_sidereal - sunpos_TETE.ra).deg + 180) % 360 - 180
             with erfa_astrom.set(ErfaAstromInterpolator(1440 * u.min)):
                 frame_obstime = AltAz(obstime=times_all_hka, location=haleakala)
                 sunpos_altaz = sunpos.transform_to(frame_obstime)
